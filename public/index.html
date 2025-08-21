@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Simple 9:16 Media Grid</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --max-width: 1080px; /* 9:16 canvas width */
+      --cols: 6;
+      --gap: 0px;          /* tight grid, no borders */
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      color: #111;
+      height: 100%;
+    }
+    .wrap {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #fff;
+    }
+    .canvas {
+      width: 100%;
+      max-width: var(--max-width);
+      aspect-ratio: 9/16;          /* strict 9:16 */
+      position: relative;
+      overflow: hidden;
+      background: #fff;
+    }
+    .grid {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-columns: repeat(var(--cols), 1fr);
+      gap: var(--gap);
+    }
+    .tile {
+      position: relative;
+      aspect-ratio: 9/16;          /* vertical tiles */
+      overflow: hidden;
+      background: #000;            /* black while loading */
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+    }
+    .fallback {
+      display: grid;
+      place-items: center;
+      font: 10px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: #555;
+      background: #e5e7eb;        /* light gray */
+      text-align: center;
+      padding: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="canvas">
+      <div id="grid" class="grid"></div>
+    </div>
+  </div>
+
+  <script>
+    // ---- CONFIG ----
+    const BASE_URL = "https://chickenscraps.github.io/my-portfolio"; // your live site
+    const PREFIXES = [
+      "media/WebsiteExports",    // no space
+      "media/Website Exports"    // with space
+    ];
+    const EXT_PRIORITY = [".mp4", ".webm", ".3gp"]; // browser picks the first playable type
+    const MAX_INDEX = 40;   // increase if you’ve got more
+    const MAX_SUB = 2;      // supports names like _1_1, _2_1, etc.
+    const LIMIT = 60;       // cap how many tiles to render (6 x 10)
+    const SHUFFLE = true;   // set false to keep numeric order
+
+    // Build stems like "media/Website Exports", "media/Website Exports_0", "media/Website Exports_0_1", ...
+    function buildStems() {
+      const stems = [];
+      for (const p of PREFIXES) {
+        stems.push(p);
+        for (let i = 0; i <= MAX_INDEX; i++) {
+          stems.push(`${p}_${i}`);
+          for (let j = 1; j <= MAX_SUB; j++) stems.push(`${p}_${i}_${j}`);
+        }
+      }
+      return stems;
+    }
+
+    function shuffle(list) {
+      const a = list.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function extToMime(ext) {
+      switch ((ext || "").toLowerCase()) {
+        case ".mp4": return "video/mp4";
+        case ".webm": return "video/webm";
+        case ".3gp": return "video/3gpp";
+        default: return "application/octet-stream";
+      }
+    }
+
+    function makeVideoElement(stem) {
+      const tile = document.createElement("div");
+      tile.className = "tile";
+
+      const video = document.createElement("video");
+      video.muted = true;
+      video.autoplay = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+
+      // Add all source variants; browser will choose one it can play.
+      EXT_PRIORITY.forEach(ext => {
+        const src = `${BASE_URL}/${encodeURI(stem + ext)}`;
+        const source = document.createElement("source");
+        source.src = src;
+        source.type = extToMime(ext);
+        video.appendChild(source);
+      });
+
+      // If the video element fails for all sources, swap to a small label.
+      video.addEventListener("error", () => {
+        const fb = document.createElement("div");
+        fb.className = "fallback";
+        fb.textContent = stem;
+        tile.replaceChildren(fb);
+      }, { once: true });
+
+      tile.appendChild(video);
+      return tile;
+    }
+
+    (function init() {
+      const stems = buildStems();
+      const list = SHUFFLE ? shuffle(stems) : stems;
+      const grid = document.getElementById("grid");
+      list.slice(0, LIMIT).forEach(stem => grid.appendChild(makeVideoElement(stem)));
+    })();
+  </script>
+</body>
+</html>
